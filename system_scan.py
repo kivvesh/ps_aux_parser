@@ -1,6 +1,8 @@
 import subprocess
 import os
 
+from datetime import datetime
+
 
 ROOT_DIR = os.getcwd()
 
@@ -27,7 +29,7 @@ def ps_aux_run():
 
 def find_users_system(user_processes):
     users = set([process.get('user') for process in user_processes])
-    return list(users)
+    return ', '.join(list(users))
 
 def get_count_user_processes(user_process):
     users_count_processes = {}
@@ -36,11 +38,26 @@ def get_count_user_processes(user_process):
             users_count_processes[process.get('user')] = 1
         else:
             users_count_processes[process.get('user')] += 1
-    return users_count_processes
+    users_count_processes = dict(sorted(users_count_processes.items(), key=lambda x:x[1],reverse=True))
+    return '\n'.join([f'{key}: {value}' for key, value in users_count_processes.items()])
 
 
 def write_allure(data):
+    name_file = f'{datetime.now().strftime("%d-%m-%Y-%H:%M")}-scan.txt'
 
+    with open(os.path.join(ROOT_DIR,name_file),'w', encoding='utf-8') as file:
+        file.write(
+f'''Отчёт о состоянии системы:
+Пользователи системы: {data.get("users")}
+Процессов запущено: {data.get("count_processes")}
+
+Пользовательских процессов:
+{data.get("count_processes_by_user")}
+
+Всего памяти используется: {data.get("sum_mem")}%
+Всего CPU используется: {data.get("sum_cpu")}%
+Больше всего памяти использует: {data.get("name_max_mem")}
+Больше всего CPU использует: {data.get("name_max_cpu")}''')
 
 
 def main():
@@ -51,8 +68,22 @@ def main():
     sum_cpu = sum([float(process.get('CPU')) for process in user_processes])
     sum_mem = sum([float(process.get('MEM')) for process in user_processes])
     max_cpu = sorted(user_processes, key=lambda x:float(x.get("CPU")), reverse=True)[0]
-    max_mem = sorted(user_processes, key=lambda x:float(x.get("MEM")), reverse=True)[0]
-    print(max_cpu, max_mem)
+    max_mem = sorted(user_processes, key=lambda x: float(x.get("MEM")), reverse=True)[0]
+    name_max_cpu = max_cpu.get('COMMAND') if len(max_cpu.get('COMMAND')) <= 20 else max_cpu.get('COMMAND')[:20]
+    name_max_mem = max_mem.get('COMMAND') if len(max_mem.get('COMMAND')) <= 20 else max_mem.get('COMMAND')[:20]
+    write_allure(
+        {
+            'users':users,
+            'count_processes':count_processes,
+            'count_processes_by_user': count_processes_by_user,
+            'sum_cpu':sum_cpu,
+            'sum_mem':sum_mem,
+            'name_max_cpu':name_max_cpu,
+            'name_max_mem':name_max_mem,
+        }
+    )
+
+
 
 
 if __name__ == '__main__':
